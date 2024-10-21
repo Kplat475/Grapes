@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Online Memory Card Game</title>
+    <title>Memory Card Game</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -15,14 +15,17 @@
             height: 100vh;
             justify-content: center;
         }
+
         h1 {
             margin: 10px;
         }
+
         .game-board {
             display: grid;
             grid-template-columns: repeat(4, 80px);
             gap: 10px;
         }
+
         .card {
             width: 80px;
             height: 120px;
@@ -31,7 +34,9 @@
             transition: transform 0.3s;
             cursor: pointer;
             border-radius: 8px;
+            visibility: hidden;
         }
+
         .card .front,
         .card .back {
             position: absolute;
@@ -43,25 +48,32 @@
             justify-content: center;
             border-radius: 8px;
         }
+
         .card .front {
             background-color: #4caf50;
             color: white;
             transform: rotateY(0deg);
         }
+
         .card .back {
             background-color: #fff;
             color: #333;
             transform: rotateY(180deg);
         }
+
         .card.flipped .front {
             transform: rotateY(180deg);
         }
+
         .card.flipped .back {
             transform: rotateY(0deg);
         }
+
         .card.matched {
             pointer-events: none;
+            visibility: visible;
         }
+
         .scoreboard {
             display: flex;
             justify-content: space-between;
@@ -74,10 +86,12 @@
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
+
         .scoreboard div {
             font-size: 20px;
             font-weight: bold;
         }
+
         .turn-indicator {
             margin-top: 10px;
             padding: 5px 10px;
@@ -86,12 +100,15 @@
             border-radius: 4px;
             font-size: 16px;
         }
+
         .current-player {
             background-color: #2e7d32;
         }
+
         .controls {
             margin-top: 20px;
         }
+
         .controls button {
             margin: 0 5px;
         }
@@ -181,6 +198,12 @@
                 card.appendChild(back);
                 card.addEventListener('click', () => flipCard(card));
                 gameBoard.appendChild(card);
+            });
+
+            // Reveal all cards after creation
+            const allCards = gameBoard.querySelectorAll('.card');
+            allCards.forEach((card) => {
+                card.style.visibility = 'visible';
             });
         }
 
