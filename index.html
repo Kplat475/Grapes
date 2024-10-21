@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -55,6 +56,12 @@
         .scoreboard div {
             font-size: 18px;
         }
+        .controls {
+            margin-top: 20px;
+        }
+        .controls input, .controls button {
+            margin: 0 5px;
+        }
     </style>
 
     <!-- Font Awesome Icons -->
@@ -89,15 +96,21 @@
             'fas fa-crow', 'fas fa-crow'
         ];
 
-        let gameId = "memory_game_online";
+        let gameId;
         let playerNumber;
         let currentPlayer = 1;
         let firstCard = null;
         let secondCard = null;
         let lockBoard = false;
+        let gameStarted = false;
 
         const gameBoard = document.getElementById('game-board');
         const turnIndicator = document.getElementById('turn-indicator');
+        const player1ScoreElement = document.getElementById('player1-score');
+        const player2ScoreElement = document.getElementById('player2-score');
+        const createGameBtn = document.getElementById('create-game-btn');
+        const joinGameBtn = document.getElementById('join-game-btn');
+        const gameIdInput = document.getElementById('game-id-input');
 
         function shuffle(array) {
             for (let i = array.length - 1; i > 0; i--) {
@@ -154,8 +167,14 @@
                     let scores = snapshot.val();
                     scores[currentPlayer] += 1;
                     update(scoreRef, scores);
+                    updateScoreElements(scores);
                 }
             });
+        }
+
+        function updateScoreElements(scores) {
+            player1ScoreElement.textContent = scores[1];
+            player2ScoreElement.textContent = scores[2];
         }
 
         function switchPlayer() {
@@ -169,28 +188,53 @@
             lockBoard = false;
         }
 
-        function joinGame() {
+        function createGame() {
+            gameId = gameIdInput.value || `memory_game_${Date.now()}`;
             const gameRef = ref(database, `/games/${gameId}`);
-            get(gameRef).then((snapshot) => {
-                if (snapshot.exists()) {
-                    playerNumber = 2;
-                } else {
-                    playerNumber = 1;
-                    set(gameRef, { currentPlayer: 1, scores: { 1: 0, 2: 0 } });
-                }
+            set(gameRef, { currentPlayer: 1, scores: { 1: 0, 2: 0 } }).then(() => {
+                playerNumber = 1;
                 createBoard();
                 turnIndicator.textContent = `Player ${playerNumber}, you are connected`;
+                gameStarted = true;
                 onValue(gameRef, (snapshot) => {
                     const data = snapshot.val();
                     if (data) {
                         currentPlayer = data.currentPlayer;
+                        updateScoreElements(data.scores);
                         turnIndicator.textContent = `Player ${currentPlayer}'s turn`;
                     }
                 });
             });
         }
 
-        joinGame();
+        function joinGame() {
+            gameId = gameIdInput.value;
+            const gameRef = ref(database, `/games/${gameId}`);
+            get(gameRef).then((snapshot) => {
+                if (snapshot.exists()) {
+                    playerNumber = 2;
+                    const data = snapshot.val();
+                    currentPlayer = data.currentPlayer;
+                    updateScoreElements(data.scores);
+                    createBoard();
+                    turnIndicator.textContent = `Player ${playerNumber}, you are connected`;
+                    gameStarted = true;
+                    onValue(gameRef, (snapshot) => {
+                        const data = snapshot.val();
+                        if (data) {
+                            currentPlayer = data.currentPlayer;
+                            updateScoreElements(data.scores);
+                            turnIndicator.textContent = `Player ${currentPlayer}'s turn`;
+                        }
+                    });
+                } else {
+                    alert('Invalid game ID');
+                }
+            });
+        }
+
+        createGameBtn.addEventListener('click', createGame);
+        joinGameBtn.addEventListener('click', joinGame);
     </script>
 </head>
 <body>
@@ -201,5 +245,10 @@
     </div>
     <div class="game-board" id="game-board"></div>
     <p id="turn-indicator">Connecting...</p>
+    <div class="controls">
+        <input type="text" id="game-id-input" placeholder="Enter Game ID">
+        <button id="create-game-btn">Create Game</button>
+        <button id="join-game-btn">Join Game</button>
+    </div>
 </body>
 </html>
