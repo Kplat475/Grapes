@@ -26,51 +26,87 @@
         .card {
             width: 80px;
             height: 120px;
-            background-color: #4caf50;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.3s;
+            cursor: pointer;
+            border-radius: 8px;
+        }
+        .card .front,
+        .card .back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
-            cursor: pointer;
             border-radius: 8px;
-            font-size: 36px;
+        }
+        .card .front {
+            background-color: #4caf50;
             color: white;
-            transition: background-color 0.3s;
+            transform: rotateY(0deg);
         }
-        .card::before {
-            content: "🐶";
-            font-size: 48px;
-        }
-        .flipped {
+        .card .back {
             background-color: #fff;
             color: #333;
-            pointer-events: none;
+            transform: rotateY(180deg);
         }
-        .flipped::before {
-            content: attr(data-icon);
+        .card.flipped .front {
+            transform: rotateY(180deg);
         }
-        .matched {
-            background-color: #2e7d32;
+        .card.flipped .back {
+            transform: rotateY(0deg);
+        }
+        .card.matched {
             pointer-events: none;
         }
         .scoreboard {
             display: flex;
             justify-content: space-between;
+            align-items: center;
             width: 80%;
             max-width: 400px;
             margin: 15px 0;
+            background-color: #fff;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
         .scoreboard div {
-            font-size: 18px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .turn-indicator {
+            margin-top: 10px;
+            padding: 5px 10px;
+            background-color: #4caf50;
+            color: #fff;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .current-player {
+            background-color: #2e7d32;
         }
         .controls {
             margin-top: 20px;
         }
-        .controls input, .controls button {
+        .controls button {
             margin: 0 5px;
+        }
+
+        @media (max-width: 768px) {
+            .game-board {
+                grid-template-columns: repeat(4, 60px);
+            }
+            .card {
+                width: 60px;
+                height: 90px;
+            }
         }
     </style>
 
-    <!-- Firebase -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
         import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
@@ -113,6 +149,8 @@
         const player2ScoreElement = document.getElementById('player2-score');
         const createGameBtn = document.getElementById('create-game-btn');
         const joinGameBtn = document.getElementById('join-game-btn');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const resetGameBtn = document.getElementById('reset-game-btn');
         const gameIdInput = document.getElementById('game-id-input');
 
         function shuffle(array) {
@@ -130,6 +168,17 @@
                 card.classList.add('card');
                 card.dataset.index = index;
                 card.dataset.icon = icon;
+
+                const front = document.createElement('div');
+                front.classList.add('front');
+                front.textContent = '🐶';
+
+                const back = document.createElement('div');
+                back.classList.add('back');
+                back.dataset.icon = icon;
+
+                card.appendChild(front);
+                card.appendChild(back);
                 card.addEventListener('click', () => flipCard(card));
                 gameBoard.appendChild(card);
             });
@@ -138,6 +187,8 @@
         function flipCard(card) {
             if (lockBoard || card.classList.contains('matched') || card === firstCard) return;
             card.classList.add('flipped');
+            card.querySelector('.front').style.transform = 'rotateY(180deg)';
+            card.querySelector('.back').style.transform = 'rotateY(0deg)';
             if (!firstCard) {
                 firstCard = card;
                 return;
@@ -157,6 +208,10 @@
                 setTimeout(() => {
                     firstCard.classList.remove('flipped');
                     secondCard.classList.remove('flipped');
+                    firstCard.querySelector('.front').style.transform = 'rotateY(0deg)';
+                    firstCard.querySelector('.back').style.transform = 'rotateY(180deg)';
+                    secondCard.querySelector('.front').style.transform = 'rotateY(0deg)';
+                    secondCard.querySelector('.back').style.transform = 'rotateY(180deg)';
                     resetBoard();
                 }, 1000);
             }
@@ -183,6 +238,7 @@
         function switchPlayer() {
             currentPlayer = currentPlayer === 1 ? 2 : 1;
             turnIndicator.textContent = `Player ${currentPlayer}'s turn`;
+            turnIndicator.classList.toggle('current-player');
             update(ref(database, `/games/${gameId}`), { currentPlayer });
         }
 
@@ -196,17 +252,7 @@
             const gameRef = ref(database, `/games/${gameId}`);
             set(gameRef, { currentPlayer: 1, scores: { 1: 0, 2: 0 } }).then(() => {
                 playerNumber = 1;
-                createBoard();
-                turnIndicator.textContent = `Player ${playerNumber}, you are connected`;
-                gameStarted = true;
-                onValue(gameRef, (snapshot) => {
-                    const data = snapshot.val();
-                    if (data) {
-                        currentPlayer = data.currentPlayer;
-                        updateScoreElements(data.scores);
-                        turnIndicator.textContent = `Player ${currentPlayer}'s turn`;
-                    }
-                });
+                startGame();
             });
         }
 
@@ -219,23 +265,43 @@
                     const data = snapshot.val();
                     currentPlayer = data.currentPlayer;
                     updateScoreElements(data.scores);
-                    createBoard();
-                    turnIndicator.textContent = `Player ${playerNumber}, you are connected`;
-                    gameStarted = true;
-                    onValue(gameRef, (snapshot) => {
-                        const data = snapshot.val();
-                        if (data) {
-                            currentPlayer = data.currentPlayer;
-                            updateScoreElements(data.scores);
-                            turnIndicator.textContent = `Player ${currentPlayer}'s turn`;
-                        }
-                    });
+                    startGame();
                 } else {
                     alert('Invalid game ID');
                 }
             });
         }
 
+        function startGame() {
+            if (!gameStarted) {
+                createBoard();
+                turnIndicator.classList.add('turn-indicator');
+                turnIndicator.classList.add('current-player');
+                gameStarted = true;
+                onValue(ref(database, `/games/${gameId}`), (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        currentPlayer = data.currentPlayer;
+                        updateScoreElements(data.scores);
+                        turnIndicator.textContent = `Player ${currentPlayer}'s turn`;
+                    }
+                });
+            }
+        }
+
+        function resetGame() {
+            const gameRef = ref(database, `/games/${gameId}`);
+            set(gameRef, { currentPlayer: 1, scores: { 1: 0, 2: 0 } }).then(() => {
+                createBoard();
+                turnIndicator.classList.add('turn-indicator');
+                turnIndicator.classList.add('current-player');
+                turnIndicator.textContent = `Player 1's turn`;
+                updateScoreElements({ 1: 0, 2: 0 });
+            });
+        }
+
+        startGameBtn.addEventListener('click', startGame);
+        resetGameBtn.addEventListener('click', resetGame);
         createGameBtn.addEventListener('click', createGame);
         joinGameBtn.addEventListener('click', joinGame);
     </script>
@@ -247,8 +313,10 @@
         <div>Player 2 Score: <span id="player2-score">0</span></div>
     </div>
     <div class="game-board" id="game-board"></div>
-    <p id="turn-indicator">Connecting...</p>
+    <div class="turn-indicator" id="turn-indicator">Connecting...</div>
     <div class="controls">
+        <button id="start-game-btn">Start Game</button>
+        <button id="reset-game-btn">Reset Game</button>
         <input type="text" id="game-id-input" placeholder="Enter Game ID">
         <button id="create-game-btn">Create Game</button>
         <button id="join-game-btn">Join Game</button>
